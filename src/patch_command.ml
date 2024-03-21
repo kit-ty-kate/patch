@@ -6,7 +6,7 @@
 
 let usage =
   "Simplified patch utility for single-file patches;\n
-   ./patch.exe -p<num> <input-file> <unififed-diff-file> -o <output-file>"
+   ./patch.exe -p<num> <input-file> <unified-diff-file> -o <output-file>"
 
 let exit_command_line_error = 1
 let exit_open_error = 2
