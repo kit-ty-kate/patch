@@ -296,7 +296,7 @@ let patch filedata diff =
     in
     Some (String.concat "\n" lines)
 
-let diff ~filename a b =
+let diff_op ~operation a b =
   let rec aux ~mine_start ~mine_len ~mine ~their_start ~their_len ~their l1 l2 =
     let create_diff ~mine_no_nl ~their_no_nl =
       let hunks =
@@ -305,14 +305,14 @@ let diff ~filename a b =
         else
           [{mine_start; mine_len; mine; their_start; their_len; their}]
       in
-      {operation = Edit filename; hunks; mine_no_nl; their_no_nl}
+      {operation; hunks; mine_no_nl; their_no_nl}
     in
     match l1, l2 with
-    | [], [] | [""], [""] when mine = [] && their = [] -> None
-    | [], [] -> Some (create_diff ~mine_no_nl:true ~their_no_nl:true)
-    | [""], [] -> Some (create_diff ~mine_no_nl:false ~their_no_nl:true)
-    | [], [""] -> Some (create_diff ~mine_no_nl:true ~their_no_nl:false)
-    | [""], [""] -> Some (create_diff ~mine_no_nl:false ~their_no_nl:false)
+    | [], [] | [""], [""] when mine = [] && their = [] -> []
+    | [], [] -> [create_diff ~mine_no_nl:true ~their_no_nl:true]
+    | [""], [] -> [create_diff ~mine_no_nl:false ~their_no_nl:true]
+    | [], [""] -> [create_diff ~mine_no_nl:true ~their_no_nl:false]
+    | [""], [""] -> [create_diff ~mine_no_nl:false ~their_no_nl:false]
     | a::l1, ([] | [""]) ->
         aux
           ~mine_start:(mine_start + 1) ~mine_len ~mine:(a :: mine)
@@ -338,3 +338,9 @@ let diff ~filename a b =
     ~mine_start:0 ~mine_len:0 ~mine:[]
     ~their_start:0 ~their_len:0 ~their:[]
     (to_lines a) (to_lines b)
+
+let diff ~filename a b = match a, b with
+  | None, None -> invalid_arg "no input given"
+  | None, Some b -> diff_op ~operation:(Create filename) "" b
+  | Some a, None -> diff_op ~operation:(Delete filename) a ""
+  | Some a, Some b -> diff_op ~operation:(Edit filename) a b
