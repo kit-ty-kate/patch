@@ -295,3 +295,46 @@ let patch filedata diff =
       | true, true -> lines
     in
     Some (String.concat "\n" lines)
+
+let diff ~filename a b =
+  let rec aux ~mine_start ~mine_len ~mine ~their_start ~their_len ~their l1 l2 =
+    let create_diff ~mine_no_nl ~their_no_nl =
+      let hunks =
+        if mine = [] && their = [] then
+          []
+        else
+          [{mine_start; mine_len; mine; their_start; their_len; their}]
+      in
+      {operation = Edit filename; hunks; mine_no_nl; their_no_nl}
+    in
+    match l1, l2 with
+    | [], [] | [""], [""] when mine = [] && their = [] -> None
+    | [], [] -> Some (create_diff ~mine_no_nl:true ~their_no_nl:true)
+    | [""], [] -> Some (create_diff ~mine_no_nl:false ~their_no_nl:true)
+    | [], [""] -> Some (create_diff ~mine_no_nl:true ~their_no_nl:false)
+    | [""], [""] -> Some (create_diff ~mine_no_nl:false ~their_no_nl:false)
+    | a::l1, ([] | [""]) ->
+        aux
+          ~mine_start:(mine_start + 1) ~mine_len ~mine:(a :: mine)
+          ~their_start:(their_start + 1) ~their_len ~their
+          l1 l2
+    | ([] | [""]), b::l2 ->
+        aux
+          ~mine_start:(mine_start + 1) ~mine_len ~mine
+          ~their_start:(their_start + 1) ~their_len ~their:(b :: their)
+          l1 l2
+    | a::l1, b::l2 when mine = [] && their = [] && String.equal a b ->
+        aux
+          ~mine_start:(mine_start + 1) ~mine_len ~mine
+          ~their_start:(their_start + 1) ~their_len ~their
+          l1 l2
+    | a::l1, b::l2 ->
+        aux
+          ~mine_start ~mine_len:(mine_len + 1) ~mine:(a :: mine)
+          ~their_start ~their_len:(their_len + 1) ~their:(b :: their)
+          l1 l2
+  in
+  aux
+    ~mine_start:0 ~mine_len:0 ~mine:[]
+    ~their_start:0 ~their_len:0 ~their:[]
+    (to_lines a) (to_lines b)
