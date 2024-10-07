@@ -251,8 +251,10 @@ let strip_prefix ~p filename =
     | [] -> assert false
     | x::xs ->
         (* Per GNU patch's spec: A sequence of one or more adjacent slashes is counted as a single slash. *)
-        let filename = x :: List.filter (function "" -> false | _ -> true) xs in
-        String.concat "/" (drop filename p)
+        let filename' = x :: List.filter (function "" -> false | _ -> true) xs in
+        match drop filename' p with
+        | [] | exception Invalid_argument _ -> filename (* GNU patch just ignores -p when the filename doesn't have enough slashes to satisfy it *)
+        | l -> String.concat "/" l
 
 let operation_of_strings ~p mine their =
   let mine_fn = String.slice ~start:4 mine
