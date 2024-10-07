@@ -85,18 +85,21 @@ let count_to_sl_sl data =
     None
 
 let sort_into_bags ~counter:(mine_len, their_len) dir mine their m_nl t_nl str =
+  let both data =
+    if m_nl || t_nl then
+      failwith "\"no newline at the end of file\" is not at the end of the file";
+    if mine_len = 0 || their_len = 0 then
+      failwith "invalid patch (both size exhausted)";
+    let counter = (mine_len - 1, their_len - 1) in
+    Some (counter, `Both, (data :: mine), (data :: their), m_nl, t_nl)
+  in
   if String.length str = 0 then
-    failwith "invalid patch (empty line)"
+    both "" (* NOTE: this should technically be a parse error but GNU patch accepts that and some patches in opam-repository do use this behaviour *)
   else if mine_len = 0 && their_len = 0 && String.get str 0 <> '\\' then
     None
   else match String.get str 0, String.slice ~start:1 str with
     | ' ', data ->
-        if m_nl || t_nl then
-          failwith "\"no newline at the end of file\" is not at the end of the file";
-        if mine_len = 0 || their_len = 0 then
-          failwith "invalid patch (both size exhausted)";
-        let counter = (mine_len - 1, their_len - 1) in
-        Some (counter, `Both, (data :: mine), (data :: their), m_nl, t_nl)
+        both data
     | '+', data ->
         if t_nl then
           failwith "\"no newline at the end of file\" is not at the end of the file";
