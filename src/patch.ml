@@ -93,10 +93,11 @@ let sort_into_bags ~counter:(mine_len, their_len) dir mine their m_nl t_nl str =
     let counter = (mine_len - 1, their_len - 1) in
     Some (counter, `Both, (data :: mine), (data :: their), m_nl, t_nl)
   in
-  if String.length str = 0 then
-    both "" (* NOTE: this should technically be a parse error but GNU patch accepts that and some patches in opam-repository do use this behaviour *)
-  else if mine_len = 0 && their_len = 0 && String.get str 0 <> '\\' then
+  let str_len = String.length str in
+  if mine_len = 0 && their_len = 0 && (str_len = 0 || str.[0] <> '\\') then
     None
+  else if str_len = 0 then
+    both "" (* NOTE: this should technically be a parse error but GNU patch accepts that and some patches in opam-repository do use this behaviour *)
   else match String.get str 0, String.slice ~start:1 str with
     | ' ', data ->
         both data
