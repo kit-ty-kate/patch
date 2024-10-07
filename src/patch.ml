@@ -272,7 +272,7 @@ let parse_one ~p data =
     | x::y::xs when String.is_prefix ~prefix:"rename from " x && String.is_prefix ~prefix:"rename to " y ->
       let hdr = Rename_only (String.slice ~start:12 x, String.slice ~start:10 y) in
       find_start ~hdr xs
-    | x::y::xs when String.is_prefix ~prefix:"--- " x ->
+    | x::y::xs when String.is_prefix ~prefix:"--- " x && String.is_prefix ~prefix:"+++ " y ->
       Some (operation_of_strings ~p x y), xs
     | _::xs -> find_start ?hdr xs
   in
