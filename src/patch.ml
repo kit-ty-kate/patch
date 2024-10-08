@@ -322,7 +322,7 @@ let patch filedata diff =
       match diff.mine_no_nl, diff.their_no_nl with
       | false, true -> (match List.rev lines with ""::tl -> List.rev tl | _ -> lines)
       | true, false -> lines @ [ "" ]
-      | false, false when filedata = None -> lines @ [ "" ]
+      | false, false when filedata = None -> lines @ [ "" ] (* TODO: i'm not sure about this *)
       | false, false -> lines
       | true, true -> lines
     in
