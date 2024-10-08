@@ -48,7 +48,7 @@ let list_cut idx l =
   in
   aux [] idx l
 
-let rec apply_hunk ~offset lines ({mine_start; mine_len; mine; their_start; their_len = _; their} as hunk) =
+let apply_hunk (offset, lines) ({mine_start; mine_len; mine; their_start; their_len; their} as _hunk) =
   try
     let mine_start = mine_start + offset in
     let prefix, rest = list_cut mine_start lines in
@@ -58,14 +58,14 @@ let rec apply_hunk ~offset lines ({mine_start; mine_len; mine; their_start; thei
     let lines = prefix @ suffix in
     let prefix, suffix = list_cut their_start lines in (* TODO: can mine_start be different from their_start? *)
     (* TODO: should we check their_len against List.length their? *)
-    prefix @ their @ suffix
+    (offset + (their_len - mine_len), prefix @ their @ suffix)
   with
   | Invalid_argument _ ->
-      let max_pos_offset = Int.max 0 (List.length lines - mine_start - mine_len) in
+     (* let _max_pos_offset = Int.max 0 (List.length lines - mine_start - mine_len) in
       (*      let max_neg_offset = Int.max 0 (mine_start - (mine_start + mine_len)) in *)
-      if offset <= max_pos_offset then
-        apply_hunk ~offset:(offset + 1) lines hunk
-      else
+      if offset <= 3 then
+        apply_hunk (offset + 1, lines) hunk
+        else *)
         invalid_arg "apply_hunk"
 
 let to_start_len data =
@@ -325,7 +325,7 @@ let patch filedata diff =
     end
   | Edit _ ->
     let old = match filedata with None -> [] | Some x -> to_lines x in
-    let lines = List.fold_left (apply_hunk ~offset:0) old diff.hunks in
+    let _, lines = List.fold_left apply_hunk (0, old) diff.hunks in
     let lines =
       match diff.mine_no_nl, diff.their_no_nl with
       | false, true -> (match List.rev lines with ""::tl -> List.rev tl | _ -> lines)
