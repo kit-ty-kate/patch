@@ -48,25 +48,46 @@ let list_cut idx l =
   in
   aux [] idx l
 
-let apply_hunk (offset, lines) ({mine_start; mine_len; mine; their_start; their_len; their} as _hunk) =
-  try
-    let mine_start = mine_start + offset in
+let apply_hunk (offset, lines) {mine_start; mine_len; mine; their_start = _; their_len; their} =
+  let mine_start = mine_start + offset in
+  (*  print_endline ("mine: "^String.concat "\n" mine); *)
+  let patch_match search_offset =
+    let mine_start = mine_start + search_offset in
     let prefix, rest = list_cut mine_start lines in
     let actual_mine, suffix = list_cut mine_len rest in
+    (*    print_endline ("actual: "^String.concat "\n" actual_mine); *)
     if (actual_mine : string list) <> (mine : string list) then
       invalid_arg "unequal mine";
-    let lines = prefix @ suffix in
-    let prefix, suffix = list_cut their_start lines in (* TODO: can mine_start be different from their_start? *)
+    (*    print_endline "found!"; *)
+(*    let lines = prefix @ suffix in
+      let prefix, suffix = list_cut their_start lines in (* TODO: can mine_start be different from their_start? *) *)
     (* TODO: should we check their_len against List.length their? *)
     (offset + (their_len - mine_len), prefix @ their @ suffix)
-  with
-  | Invalid_argument _ ->
-     (* let _max_pos_offset = Int.max 0 (List.length lines - mine_start - mine_len) in
-      (*      let max_neg_offset = Int.max 0 (mine_start - (mine_start + mine_len)) in *)
-      if offset <= 3 then
-        apply_hunk (offset + 1, lines) hunk
-        else *)
+  in
+  try patch_match 0
+  with Invalid_argument _ ->
+    let max_pos_offset = Int.max 0 (List.length lines - mine_start - mine_len) in
+    let max_neg_offset = mine_start in
+    let rec locate search_offset =
+      let aux search_offset max_offset =
+        try
+          if search_offset <= max_offset then
+            Some (patch_match search_offset)
+          else
+            None
+        with Invalid_argument _ -> None
+      in
+      if search_offset > max_pos_offset && search_offset > max_neg_offset then
         invalid_arg "apply_hunk"
+      else
+        match aux search_offset max_pos_offset with
+        | Some x -> x
+        | None ->
+            match aux (-search_offset) max_neg_offset with
+            | Some x -> x
+            | None -> locate (search_offset + 1)
+    in
+    locate 1
 
 let to_start_len data =
   (* input being "?19,23" *)
