@@ -30,15 +30,6 @@ let pp_hunk ~mine_no_nl ~their_no_nl ppf hunk =
     hunk.mine_start hunk.mine_len hunk.their_start hunk.their_len
     (unified_diff ~mine_no_nl ~their_no_nl hunk)
 
-let take data num =
-  let rec take0 num data acc =
-    match num, data with
-    | 0, _ -> List.rev acc
-    | n, x::xs -> take0 (pred n) xs (x :: acc)
-    | _ -> invalid_arg "take0 broken"
-  in
-  take0 num data []
-
 let drop data num =
   let rec drop data num =
     match num, data with
@@ -49,14 +40,26 @@ let drop data num =
   try drop data num with
   | Invalid_argument _ -> invalid_arg ("drop " ^ string_of_int num ^ " on " ^ string_of_int (List.length data))
 
-(* TODO verify that it applies cleanly *)
-let apply_hunk old (index, to_build) hunk =
+let list_cut idx l =
+  let rec aux acc idx = function
+    | l when idx = 0 -> (List.rev acc, l)
+    | [] -> invalid_arg "list_cut"
+    | x::xs -> aux (x :: acc) (idx - 1) xs
+  in
+  aux [] idx l
+
+let apply_hunk lines {mine_start; mine_len; mine; their_start; their_len = _; their} =
   try
-    let prefix = take (drop old index) (hunk.mine_start - index) in
-    (hunk.mine_start + hunk.mine_len, to_build @ prefix @ hunk.their)
+    let prefix, rest = list_cut mine_start lines in
+    let actual_mine, suffix = list_cut mine_len rest in
+    if (actual_mine : string list) <> (mine : string list) then
+      invalid_arg "unequal mine";
+    let lines = prefix @ suffix in
+    let prefix, suffix = list_cut their_start lines in (* TODO: can mine_start be different from their_start? *)
+    (* TODO: should we check their_len against List.length their? *)
+    prefix @ their @ suffix
   with
-  | Invalid_argument _ -> invalid_arg ("apply_hunk " ^ string_of_int index ^ " old len " ^ string_of_int (List.length old) ^
-                                       " hunk start " ^ string_of_int hunk.mine_start ^ " hunk len " ^ string_of_int hunk.mine_len)
+  | Invalid_argument _ -> invalid_arg "apply_hunk"
 
 let to_start_len data =
   (* input being "?19,23" *)
@@ -314,8 +317,7 @@ let patch filedata diff =
     end
   | Edit _ ->
     let old = match filedata with None -> [] | Some x -> to_lines x in
-    let idx, lines = List.fold_left (apply_hunk old) (0, []) diff.hunks in
-    let lines = lines @ drop old idx in
+    let lines = List.fold_left apply_hunk old diff.hunks in
     let lines =
       match diff.mine_no_nl, diff.their_no_nl with
       | false, true -> (match List.rev lines with ""::tl -> List.rev tl | _ -> lines)
