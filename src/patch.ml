@@ -71,6 +71,7 @@ let to_start_len data =
      and start = int_of_string start
      in
      let st = if len = 0 || start = 0 then start else pred start in
+     (* TODO: investigate start line. This shouldn't be start - 1 but the output of diff is also inconsistent *)
      (st, len)
 
 let count_to_sl_sl data =
