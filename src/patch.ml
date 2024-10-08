@@ -48,7 +48,7 @@ let list_cut idx l =
   in
   aux [] idx l
 
-let apply_hunk (offset, lines) {mine_start; mine_len; mine; their_start = _; their_len; their} =
+let apply_hunk ~cleanly (offset, lines) {mine_start; mine_len; mine; their_start = _; their_len; their} =
   let mine_start = mine_start + offset in
   (*  print_endline ("mine: "^String.concat "\n" mine); *)
   let patch_match search_offset =
@@ -66,28 +66,31 @@ let apply_hunk (offset, lines) {mine_start; mine_len; mine; their_start = _; the
   in
   try patch_match 0
   with Invalid_argument _ ->
-    let max_pos_offset = Int.max 0 (List.length lines - mine_start - mine_len) in
-    let max_neg_offset = mine_start in
-    let rec locate search_offset =
-      let aux search_offset max_offset =
-        try
-          if search_offset <= max_offset then
-            Some (patch_match search_offset)
-          else
-            None
-        with Invalid_argument _ -> None
+    if cleanly then
+      invalid_arg "apply_hunk"
+    else
+      let max_pos_offset = Int.max 0 (List.length lines - mine_start - mine_len) in
+      let max_neg_offset = mine_start in
+      let rec locate search_offset =
+        let aux search_offset max_offset =
+          try
+            if search_offset <= max_offset then
+              Some (patch_match search_offset)
+            else
+              None
+          with Invalid_argument _ -> None
+        in
+        if search_offset > max_pos_offset && search_offset > max_neg_offset then
+          invalid_arg "apply_hunk"
+        else
+          match aux search_offset max_pos_offset with
+          | Some x -> x
+          | None ->
+              match aux (-search_offset) max_neg_offset with
+              | Some x -> x
+              | None -> locate (search_offset + 1)
       in
-      if search_offset > max_pos_offset && search_offset > max_neg_offset then
-        invalid_arg "apply_hunk"
-      else
-        match aux search_offset max_pos_offset with
-        | Some x -> x
-        | None ->
-            match aux (-search_offset) max_neg_offset with
-            | Some x -> x
-            | None -> locate (search_offset + 1)
-    in
-    locate 1
+      locate 1
 
 let to_start_len data =
   (* input being "?19,23" *)
@@ -332,7 +335,7 @@ let parse ~p data =
   in
   doit ~p [] lines
 
-let patch filedata diff =
+let patch ~cleanly filedata diff =
   match diff.operation with
   | Rename_only _ -> filedata
   | Delete _ -> None
@@ -346,7 +349,7 @@ let patch filedata diff =
     end
   | Edit _ ->
     let old = match filedata with None -> [] | Some x -> to_lines x in
-    let _, lines = List.fold_left apply_hunk (0, old) diff.hunks in
+    let _, lines = List.fold_left (apply_hunk ~cleanly) (0, old) diff.hunks in
     let lines =
       match diff.mine_no_nl, diff.their_no_nl with
       | false, true -> (match List.rev lines with ""::tl -> List.rev tl | _ -> lines)
