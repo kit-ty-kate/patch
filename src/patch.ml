@@ -48,7 +48,7 @@ let list_cut idx l =
   in
   aux [] idx l
 
-let apply_hunk ~cleanly (offset, lines) {mine_start; mine_len; mine; their_start = _; their_len; their} =
+let apply_hunk ~cleanly (last_matched_line, offset, lines) {mine_start; mine_len; mine; their_start = _; their_len; their} =
   let mine_start = mine_start + offset in
   (*  print_endline ("mine: "^String.concat "\n" mine); *)
   let patch_match search_offset =
@@ -62,7 +62,7 @@ let apply_hunk ~cleanly (offset, lines) {mine_start; mine_len; mine; their_start
 (*    let lines = prefix @ suffix in
       let prefix, suffix = list_cut their_start lines in (* TODO: can mine_start be different from their_start? *) *)
     (* TODO: should we check their_len against List.length their? *)
-    (offset + (their_len - mine_len), prefix @ their @ suffix)
+    (mine_start + mine_len, offset + (their_len - mine_len), prefix @ their @ suffix)
   in
   try patch_match 0
   with Invalid_argument _ ->
@@ -70,7 +70,7 @@ let apply_hunk ~cleanly (offset, lines) {mine_start; mine_len; mine; their_start
       invalid_arg "apply_hunk"
     else
       let max_pos_offset = Int.max 0 (List.length lines - mine_start - mine_len) in
-      let max_neg_offset = mine_start in
+      let max_neg_offset = mine_start - last_matched_line in
       let rec locate search_offset =
         let aux search_offset max_offset =
           try
@@ -349,7 +349,7 @@ let patch ~cleanly filedata diff =
     end
   | Edit _ ->
     let old = match filedata with None -> [] | Some x -> to_lines x in
-    let _, lines = List.fold_left (apply_hunk ~cleanly) (0, old) diff.hunks in
+    let _, _, lines = List.fold_left (apply_hunk ~cleanly) (0, 0, old) diff.hunks in
     let lines =
       match diff.mine_no_nl, diff.their_no_nl with
       | false, true -> (match List.rev lines with ""::tl -> List.rev tl | _ -> lines)
